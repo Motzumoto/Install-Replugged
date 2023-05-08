@@ -21,12 +21,12 @@ if %errorlevel% == 0 (
   goto check_replugged
 )
 echo Node.js is not installed on this system.
-choice /c yn /m "Do you want to install Node.js now?"
-if errorlevel 2 (
-  echo Exiting script.
-  goto :eof
+set /p install="Do you want to install Node.js now? (y/n) "
+if /i "%install%" == "y" (
+  goto install_nodejs
 )
-goto install_nodejs
+echo Exiting script.
+goto :eof
 
 :install_nodejs
 echo Downloading Node.js installer...

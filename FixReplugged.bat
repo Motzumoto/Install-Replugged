@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 :check_connection
 cls
@@ -21,14 +21,35 @@ if %errorlevel% == 0 (
   goto check_replugged
 )
 echo Node.js is not installed on this system.
-set /p install="Do you want to install Node.js now? (y/n) "
-if /i "%install%" == "y" (
-  goto install_nodejs
+echo Checking if winget is installed...
+where winget >nul 2>&1
+if %errorlevel% == 0 (
+  echo winget is installed. Proceeding with Node.js installation.
+  goto install_nodejs_with_winget
+) else (
+  echo winget is not installed.
+  choice /c yn /m "Do you want to install Node.js now?"
+  if errorlevel 2 (
+    echo Exiting script.
+    goto :eof
+  )
+  goto install_nodejs_with_msi
 )
-echo Exiting script.
+
+:install_nodejs_with_winget
+echo Installing Node.js with winget...
+call winget install nodejs -e --silent
+if %errorlevel% == 0 (
+  echo Node.js installation successful.
+  call refreshenv
+  goto check_nodejs
+)
+echo Node.js installation failed. Exiting script.
+start "" "https://nodejs.org/en/download/"
 goto :eof
 
-:install_nodejs
+
+:install_nodejs_with_msi
 echo Downloading Node.js installer...
 bitsadmin /transfer "nodejs_installer" /download /priority high "https://nodejs.org/dist/v18.13.0/node-v18.13.0-x64.msi" "%temp%\node-v18.13.0-x64.msi"
 echo Installing Node.js...
@@ -40,7 +61,6 @@ if %ERRORLEVEL% == 0 (
 echo Node.js installation failed. Exiting script.
 start "" "https://nodejs.org/en/download/"
 goto :eof
-
 
 :check_replugged
 echo Checking if replugged is installed...
@@ -55,7 +75,7 @@ if not exist "%userprofile%\replugged" (
   )
 ) else (
   echo replugged is already installed.
-  goto check_discord
+  goto ask_version
 )
 
 :install_replugged
@@ -72,90 +92,76 @@ if not %errorlevel% == 0 (
   goto :eof
 ) else (
   echo replugged installation successful.
-  goto check_discord
+  goto ask_version
 )
 
-
-:check_discord
+:ask_version
 set /p discordversion="Which discord version you want to install replugged on? (stable,ptb,canary,development) [stable]: " /t 20
 if "%discordversion%" == "" (set discordversion=stable)
-
-
 if /i "%discordversion%" == "stable" (
   echo Stopping Discord process...
   taskkill /f /im discord.exe >nul 2>&1
-  if not %errorlevel% == 0 (
-    echo Failed to stop Discord process.
-  )
+  goto discord_installation
 ) else if /i "%discordversion%" == "ptb" (
   echo Stopping DiscordPTB process...
   taskkill /f /im discordptb.exe >nul 2>&1
-  if not %errorlevel% == 0 (
-    echo Failed to stop DiscordPTB process.
-  )
+  goto discord_installation
 ) else if /i "%discordversion%" == "canary" (
   echo Stopping DiscordCanary process...
   taskkill /f /im discordcanary.exe >nul 2>&1
-  if not %errorlevel% == 0 (
-    echo Failed to stop DiscordCanary process.
-  )
+  goto discord_installation
 ) else if /i "%discordversion%" == "development" (
   echo Stopping DiscordDevelopment process...
   taskkill /f /im discorddevelopment.exe >nul 2>&1
-  if not %errorlevel% == 0 (
-    echo Failed to stop DiscordDevelopment process.
-  )
+  goto discord_installation
 ) else (
-  echo Invalid input. Exiting script.
+  echo Invalid input. Please try again.
+  goto ask_version
+)
+
+:discord_installation
+echo Installing pnpm...
+call npm install -g pnpm >nul 2>&1
+if not %errorlevel% == 0 (
+  echo Failed to install pnpm.
   goto :eof
 )
 
-echo Installing pnpm...
-call npm i -g pnpm >nul 2>&1
-if not %errorlevel% == 0 (
-  echo Failed to install pnpm.
-)
-
 echo Changing to %userprofile%\replugged directory...
-PUSHD %userprofile%\replugged >nul 2>&1
+cd %userprofile%\replugged
 if not %errorlevel% == 0 (
   echo Failed to change to %userprofile%\replugged directory.
+  goto :eof
 )
 
 echo Updating global git configuration...
 call git config --global --add safe.directory %userprofile%\replugged >nul 2>&1
 if not %errorlevel% == 0 (
   echo Failed to update global git configuration.
+  goto :eof
 )
 
 echo Pulling latest changes from Git repository...
+call git fetch --all >nul 2>&1
+call git reset --hard origin/main >nul 2>&1
 call git pull >nul 2>&1
 if not %errorlevel% == 0 (
   echo Failed to pull latest changes from Git repository.
+  goto :eof
 )
 
 echo Unplugging %discordversion%...
 call pnpm run unplug %discordversion% >nul 2>&1
-if not %errorlevel% == 0 (
-  echo Failed to unplug %discordversion%.
-)
 
 echo Installing dependencies...
 call pnpm i >nul 2>&1
-if not %errorlevel% == 0 (
-  echo Failed to install dependencies.
-)
+
+
 echo Building project...
-call pnpm run build >nul 2>&1
-if not %errorlevel% == 0 (
-  echo Failed to build project.
-)
+call pnpm run bundle >nul 2>&1
 
 echo Plugging %discordversion%...
-call pnpm run plug %discordversion% >nul 2>&1
-if not %errorlevel% == 0 (
-  echo Failed to plug %discordversion%.
-)
+call pnpm run plug --production %discordversion%  
 
 echo Launching %discordversion% update process...
 if /i "%discordversion%" == "stable" (
@@ -168,7 +174,6 @@ if /i "%discordversion%" == "stable" (
   START "" "%localappdata%\DiscordDevelopment\Update.exe" --processStart discorddevelopment.exe
 )
 
-echo Restoring original current directory...
-POPD
-
 echo Done.
+goto :eof
+

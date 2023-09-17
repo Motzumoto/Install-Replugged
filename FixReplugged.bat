@@ -13,6 +13,27 @@ if not %errorlevel% == 0 (
   echo Internet connection detected. Proceeding with script.
 )
 
+:check_winget
+echo Checking if winget is installed...
+where winget >nul 2>&1
+if %errorlevel% == 0 (
+  echo winget is already installed.
+) else (
+  echo winget is not installed on this system.
+  choice /c yn /m "Do you want to install winget now?"
+  if errorlevel 2 (
+    echo Exiting script.
+    goto :eof
+  )
+  echo Installing winget...
+  start "" "https://github.com/microsoft/winget-cli/releases/download/v1.5.2201/Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+  echo The script will now exit and give you time to install winget.
+  echo Once you have installed winget, run this script again.
+  timeout /t 10 >nul 2>&1
+  goto :eof
+)
+goto check_git
+
 :check_git
 echo Checking if Git is installed...
 where git >nul 2>&1

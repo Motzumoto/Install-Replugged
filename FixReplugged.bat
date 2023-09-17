@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-
+call refreshenv
 :check_connection
 cls
 echo Checking for internet connection...
@@ -12,6 +12,28 @@ if not %errorlevel% == 0 (
 ) else (
   echo Internet connection detected. Proceeding with script.
 )
+
+:check_git
+echo Checking if Git is installed...
+where git >nul 2>&1
+if %errorlevel% == 0 (
+  echo Git is already installed.
+  goto check_nodejs
+) else (
+  echo Git is not installed on this system.
+  choice /c yn /m "Do you want to install Git now?"
+  if errorlevel 2 (
+    echo Exiting script.
+    goto :eof
+  )
+  goto install_git
+)
+
+:install_git
+echo To install git, you must download it from the official website. Make sure to check the 'ADD TO PATH' option during installation.
+start "" "https://git-scm.com/downloads"
+echo The script will now exit and give you time to install Git. Once you have installed Git, run this script again.
+goto :eof
 
 :check_nodejs
 echo Checking if Node.js is installed...
@@ -48,7 +70,6 @@ echo Node.js installation failed. Exiting script.
 start "" "https://nodejs.org/en/download/"
 goto :eof
 
-
 :install_nodejs_with_msi
 echo Downloading Node.js installer...
 bitsadmin /transfer "nodejs_installer" /download /priority high "https://nodejs.org/dist/v18.13.0/node-v18.13.0-x64.msi" "%temp%\node-v18.13.0-x64.msi"
@@ -61,6 +82,8 @@ if %ERRORLEVEL% == 0 (
 echo Node.js installation failed. Exiting script.
 start "" "https://nodejs.org/en/download/"
 goto :eof
+
+
 
 :check_replugged
 echo Checking if replugged is installed...
@@ -122,6 +145,7 @@ if /i "%discordversion%" == "stable" (
 :discord_installation
 echo Installing pnpm...
 call npm install -g pnpm >nul 2>&1
+call refreshenv
 if not %errorlevel% == 0 (
   echo Failed to install pnpm.
   goto :eof
